@@ -253,6 +253,78 @@ public class Server {
 	}
 
 	/**
+	 *     _____ ______ _______
+	 *    / ____|  ____|__   __|
+	 *   | |  __| |__     | |
+	 *   | | |_ |  __|    | |
+	 *   | |__| | |____   | |
+	 *    \_____|______|  |_|
+	 */
+
+	/**
+	 * Gets the number of currently online users.
+	 *
+	 * @return number of users currently online.
+	 */
+	public int getNumOnline() {
+		return this.numOnline;
+	}
+
+	/**
+	 * Gets the number of currently offline users.
+	 *
+	 * @return number of users currently offline.
+	 */
+	public int getNumOffline() {
+		return this.numOffline;
+	}
+
+	/**
+	 * Gets the total number of users either online or offline.
+	 *
+	 * @return the total number of users either online or offline.
+	 */
+	public int getTotalUserCount() {
+		return this.numOnline + this.numOffline;
+	}
+
+	/**
+	 * Gets all the currently online users.
+	 *
+	 * @return all users currently online.
+	 */
+	public HashSet<String> getOnlineUsers() {
+		return onlineUsers;
+	}
+
+	/**
+	 * Gets all the currently offline users.
+	 *
+	 * @return all users currently offline.
+	 */
+	public HashSet<String> getOfflineUsers() {
+		return offlineUsers;
+	}
+
+	/**
+	 * Gets all the users that have been seen by the server.
+	 *
+	 * @return all users that have been seen by the server.
+	 */
+	public HashSet<String> getSeenUsers() {
+		return seenUsers;
+	}
+
+	/**
+	 * Gets the currently connected clients.
+	 *
+	 * @return the list of all the currently connected clients.
+	 */
+	public HashSet<ClientHandler> getClients() {
+		return clients;
+	}
+
+	/**
 	 * Main function to run the server.
 	 *
 	 * @param args the command-line arguments.
