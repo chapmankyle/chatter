@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashSet;
+import java.util.Scanner;
 
 public class Server {
 
@@ -63,7 +64,7 @@ public class Server {
 		try {
 			server = new ServerSocket(this.port);
 		} catch (IOException e) {
-			error("Unable to start the server.", e);
+			KError.printError("Unable to start the server.", e);
 			quit();
 		}
 
@@ -71,67 +72,184 @@ public class Server {
 		System.out.printf("Now accepting clients on port \033[33m%d\033[0m\n\n",
 			this.port);
 
-		// client
+		// check for 'quit' signal
+		Thread q = new Thread() {
+			@Override
+			public void run() {
+				checkQuit();
+			}
+		};
+		q.start();
+
 		Socket client = null;
 
 		// wait for a client to connect
 		while (true) {
 			try {
-				// accept a client
+				// accept the new client
 				client = server.accept();
 
 				ClientHandler ch = new ClientHandler(this, client);
 
-				// add to online clients
+				// add to online clients and start handler
 				clients.add(ch);
 				ch.start();
 			} catch (IOException e) {
-				error("Error trying to connect client.", e);
+				KError.printError("Error trying to connect client.", e);
 			}
 		}
 	}
 
-
-
 	/**
-	 * Prints a formatted exception message to standard output.
-	 *
-	 * @param message the message to display.
-	 * @param e the exception that was thrown.
+	 * Checks for 'quit' signal to be typed.
 	 */
-	private void error(String message, Exception e) {
-		String errorMessage = e.toString();
-		String cause = "";
-		String error = "";
+	private void checkQuit() {
+		Scanner scan = new Scanner(System.in);
+		String text = scan.nextLine();
 
-		if (!errorMessage.contains(":")) {
-			System.out.println("\n\033[33m" + message + "\033[0m\n" + errorMessage + "\n");
-			return;
+		// loop until 'quit' is typed
+		while (!text.equals("quit")) {
+			text = scan.nextLine();
 		}
 
-		int idx = errorMessage.indexOf(":");
-		cause = errorMessage.substring(0, idx);
-		error = errorMessage.substring(idx + 2);
+		// close all connections
+		for (ClientHandler ch : clients) {
+			ch.close();
+		}
 
-		System.out.println("\n[\033[31m" + cause + "\033[0m] " + "\033[33m" + message + "\033[0m\n" +
-			error + "\n");
+		// close scanner and exit
+		scan.close();
+		quit();
 	}
 
 	/**
 	 * Quits the server and closes all open connections.
 	 */
-	public void quit() {
+	private void quit() {
 		// perform clean-up then exit
 		try {
 			if (server != null) {
 				server.close();
 			}
 		} catch (IOException e) {
-			error("Unable to close all connections.", e);
+			KError.printError("Unable to close all connections.", e);
 		}
 
 		System.out.println("\nGoodbye!");
 		System.exit(0);
+	}
+
+	/**
+	 *    _____  _    _ ____  _      _____ _____
+	 *   |  __ \| |  | |  _ \| |    |_   _/ ____|
+	 *   | |__) | |  | | |_) | |      | || |
+	 *   |  ___/| |  | |  _ <| |      | || |
+	 *   | |    | |__| | |_) | |____ _| || |____
+	 *   |_|     \____/|____/|______|_____\_____|
+	 */
+
+	/**
+	 * Checks whether or not a user is currently online.
+	 *
+	 * @param username the username to check.
+	 * @return {@code true} if username is online, {@code false} otherwise.
+	 */
+	public boolean isUserOnline(String username) {
+		boolean online = false;
+
+		// ensure thread-safe read
+		synchronized (onlineUsers) {
+			online = onlineUsers.contains(username);
+		}
+
+		return online;
+	}
+
+	/**
+	 * Checks whether or not a user has been seen by the server.
+	 *
+	 * @param username the username of the user.
+	 * @return {@code true} if the user has been seen before, {@code false} otherwise.
+	 */
+	public boolean hasUserBeenSeen(String username) {
+		boolean seen = false;
+
+		// ensure thread-safe read
+		synchronized (seenUsers) {
+			seen = seenUsers.contains(username);
+		}
+
+		return seen;
+	}
+
+	/**
+	 * Updates user status to online.
+	 *
+	 * @param username the user that is online.
+	 */
+	public void addUser(String username) {
+		// only add user if not already online
+		synchronized (onlineUsers) {
+			if (!onlineUsers.contains(username)) {
+				onlineUsers.add(username);
+				this.numOnline = onlineUsers.size();
+			}
+		}
+
+		// remove user from offline list
+		synchronized (offlineUsers) {
+			if (offlineUsers.contains(username)) {
+				offlineUsers.remove(username);
+				this.numOffline = offlineUsers.size();
+			}
+		}
+
+		// add user to all users if not already in list
+		synchronized (seenUsers) {
+			if (!seenUsers.contains(username)) {
+				seenUsers.add(username);
+			}
+		}
+	}
+
+	/**
+	 * Adds a user when the ClientHandler is specified.
+	 *
+	 * @param user the client handler for the user.
+	 */
+	public void addUser(ClientHandler user) {
+		addUser(user.getUsername());
+	}
+
+	/**
+	 * Updates user status to offline.
+	 *
+	 * @param user the user that is offline.
+	 */
+	public void removeUser(ClientHandler user) {
+		// get client username
+		String username = user.getUsername();
+
+		// remove user from online user list
+		synchronized (onlineUsers) {
+			if (onlineUsers.contains(username)) {
+				onlineUsers.remove(username);
+				this.numOnline = onlineUsers.size();
+			}
+		}
+
+		// add user to offline list if not already in list
+		synchronized (offlineUsers) {
+			if (!offlineUsers.contains(username)) {
+				offlineUsers.add(username);
+				this.numOffline = offlineUsers.size();
+			}
+		}
+
+		// remove from ClientHandler list
+		synchronized (clients) {
+			clients.remove(user);
+		}
 	}
 
 	/**
