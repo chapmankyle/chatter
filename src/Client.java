@@ -72,7 +72,7 @@ public class Client {
 		try {
 			this.client = new Socket(this.hostname, this.port);
 		} catch (IOException e) {
-			error("Unable to connect to server.", e);
+			KError.printError("Unable to connect to server.", e);
 			return false;
 		}
 
@@ -81,7 +81,7 @@ public class Client {
 			this.dos = new DataOutputStream(this.client.getOutputStream());
 			this.dis = new DataInputStream(this.client.getInputStream());
 		} catch (IOException e) {
-			error("Unable to obtain data streams.", e);
+			KError.printError("Unable to obtain data streams.", e);
 			return false;
 		}
 
@@ -107,7 +107,7 @@ public class Client {
 			this.dos.writeUTF("login#" + user);
 			this.dos.flush();
 		} catch (IOException e) {
-			error("Unable to send login packet.", e);
+			KError.printError("Unable to send login packet.", e);
 			return false;
 		}
 
@@ -117,7 +117,7 @@ public class Client {
 		try {
 			response = this.dis.readUTF().trim();
 		} catch (IOException e) {
-			error("Unable to read server response.", e);
+			KError.printError("Unable to read server response.", e);
 			return false;
 		}
 
@@ -129,39 +129,6 @@ public class Client {
 		// login successful
 		this.username = user;
 		return true;
-	}
-
-	/**
-	 *    _____  _____  _______      __  _______ ______
-	 *   |  __ \|  __ \|_   _\ \    / /\|__   __|  ____|
-	 *   | |__) | |__) | | |  \ \  / /  \  | |  | |__
-	 *   |  ___/|  _  /  | |   \ \/ / /\ \ | |  |  __|
-	 *   | |    | | \ \ _| |_   \  / ____ \| |  | |____
-	 *   |_|    |_|  \_\_____|   \/_/    \_\_|  |______|
-	 */
-
-	/**
-	 * Prints a formatted exception message to standard output.
-	 *
-	 * @param message the message to display.
-	 * @param e the exception that was thrown.
-	 */
-	private void error(String message, Exception e) {
-		String errorMessage = e.toString();
-		String cause = "";
-		String error = "";
-
-		if (!errorMessage.contains(":")) {
-			System.out.println("\n\033[33m" + message + "\033[0m\n" + errorMessage + "\n");
-			return;
-		}
-
-		int idx = errorMessage.indexOf(":");
-		cause = errorMessage.substring(0, idx);
-		error = errorMessage.substring(idx + 2);
-
-		System.out.println("\n[\033[31m" + cause + "\033[0m] " + "\033[33m" + message + "\033[0m\n" +
-			error + "\n");
 	}
 
 	/**
