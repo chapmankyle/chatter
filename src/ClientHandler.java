@@ -63,6 +63,119 @@ public class ClientHandler extends Thread {
 	 */
 	@Override
 	public void run() {
+		Command command = Command.INVALID;
+
+		// keep connection open to receive data
+		while (true) {
+			String recv = "";
+
+			// read and process command received
+			try {
+				recv = this.dis.readUTF();
+
+				// ignore message not split with #
+				if (!recv.contains("#")) {
+					continue;
+				}
+
+				int idx = recv.indexOf("#");
+
+				// get data from message
+				String header = recv.substring(0, idx);
+				String body = recv.substring(idx + 1).trim();
+
+				command = command.getValue(header);
+
+				// ignore invalid header command
+				if (command == Command.INVALID) {
+					System.out.println("\nClient sent \033[31minvalid\033[0m header!");
+					continue;
+				}
+
+				// logout user if requested
+				if (command == Command.LOGOUT) {
+					logout(body);
+					break;
+				}
+
+				processCommand(command, body);
+			} catch (IOException e) {
+				if (this.username.isEmpty()) {
+					break;
+				}
+
+				// logout user
+				logout(this.username);
+				break;
+			}
+		}
+	}
+
+	/**
+	 * Processes the command that the client sent.
+	 *
+	 * @param cmd the command that the client sent.
+	 * @param body the rest of the message.
+	 */
+	private void processCommand(Command cmd, String body) {
+		switch (cmd) {
+			case USERS:
+				users();
+				break;
+			case LOGIN:
+				login(body);
+				break;
+			case MSG:
+				message(body);
+				break;
+			case WHSP:
+				whisper(body);
+				break;
+			default:
+				break;
+		}
+	}
+
+	/**
+	 * Returns a string list of users who are currently online.
+	 */
+	private void users() {
+
+	}
+
+	/**
+	 * Connects a user to the server.
+	 *
+	 * @param user the user to connect.
+	 */
+	private void login(String user) {
+
+	}
+
+	/**
+	 * Disconnects a user from the server.
+	 *
+	 * @param user the user to disconnect.
+	 */
+	private void logout(String user) {
+
+	}
+
+	/**
+	 * Displays a message sent by a user to everyone else connected.
+	 *
+	 * @param user the user who sent the message.
+	 */
+	private void message(String user) {
+
+	}
+
+	/**
+	 * Sends a private message (whisper) to another connected client.
+	 *
+	 * @param body the body of the command sent.
+	 */
+	private void whisper(String body) {
 
 	}
 
