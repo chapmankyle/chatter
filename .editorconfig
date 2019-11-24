@@ -1,0 +1,19 @@
+# config settings
+root = True
+
+# for all files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# only Makefile
+[Makefile]
+indent_style = tab
+tab_width = 2
+
+# Java files in src directory
+[src/**.java]
+indent_style = tab
+tab_width = 4
