@@ -20,6 +20,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.HashSet;
 
 public class ClientHandler extends Thread {
 
@@ -120,7 +121,7 @@ public class ClientHandler extends Thread {
 	private void processCommand(Command cmd, String body) {
 		switch (cmd) {
 			case USERS:
-				users();
+				users(body);
 				break;
 			case LOGIN:
 				login(body);
@@ -138,9 +139,32 @@ public class ClientHandler extends Thread {
 
 	/**
 	 * Returns a string list of users who are currently online.
+	 *
+	 * @param user the user who requested the list of online users.
 	 */
-	private void users() {
+	private void users(String user) {
+		HashSet<String> onlineUsers = server.getOnlineUsers();
 
+		// build string of all online users
+		StringBuilder sb = new StringBuilder();
+		for (String uname : onlineUsers) {
+			// ignore user who requested list
+			if (uname.equals(user)) {
+				continue;
+			}
+
+			sb.append(uname + "#");
+		}
+
+		String userList = "users#" + sb.toString();
+
+		// write user list to output
+		try {
+			this.dos.writeUTF(userList);
+			this.dos.flush();
+		} catch (IOException e) {
+			KError.printError("Unable to write user list to output.", e);
+		}
 	}
 
 	/**
@@ -149,7 +173,10 @@ public class ClientHandler extends Thread {
 	 * @param user the user to connect.
 	 */
 	private void login(String user) {
-
+		// no username specified
+		if (user.isEmpty()) {
+			return;
+		}
 	}
 
 	/**
