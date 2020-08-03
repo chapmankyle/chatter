@@ -1,87 +1,78 @@
-/**
- * Chatter is a peer-to-peer communication program written in Java.
- * Copyright (C) 2019 Kyle Chapman
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
- */
-
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.ArrayList;
+
+import javafx.application.Platform;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ListView;
+import javafx.scene.control.TextArea;
+
+import javax.swing.*;
+
+/**
+ * Client class for handling everything that isn't to do with the server.
+ *
+ * Each new client is handled through the ClientHandler class, where Client-Server
+ * interaction takes place.
+ *
+ * @since 27 July 2019
+ * @version 1.0.0
+ * @author Kyle Chapman, Noah Atkins
+ */
 
 public class Client {
 
 	// globals
+	private final String hostname;
+	private final int port;
+
 	private String username;
-	private String hostname;
-
-	private int port;
-
 	private Socket client;
-
 	private DataInputStream dis;
 	private DataOutputStream dos;
 
-	/**
-	 * Constructor for a client.
-	 *
-	 * @param hostname the hostname to connect to.
-	 * @param port the port to connect with
-	 */
+	private ArrayList<UserListener> userListeners;
+	private ArrayList<String> commands;
+
+	private TextArea globalTxa;
+	private TextArea whisperTxa;
+	private ListView<String> lstOnline;
+	private ListView<String> lstOffline;
+	private ComboBox<String> cmbWhisperTo;
+
+	// default constructor
 	public Client(String hostname, int port) {
 		this.hostname = hostname;
 		this.port = port;
-
 		this.username = "";
+		this.userListeners = new ArrayList<>();
+		this.commands = new ArrayList<>();
 
-		this.client = null;
-		this.dis = null;
-		this.dos = null;
-
-		setup();
+		// add commands
+		this.commands.add("login");
+		this.commands.add("logout");
+		this.commands.add("msg");
+		this.commands.add("online");
+		this.commands.add("offline");
 	}
 
 	/**
-	 *    _____  _    _ ____  _      _____ _____
-	 *   |  __ \| |  | |  _ \| |    |_   _/ ____|
-	 *   | |__) | |  | | |_) | |      | || |
-	 *   |  ___/| |  | |  _ <| |      | || |
-	 *   | |    | |__| | |_) | |____ _| || |____
-	 *   |_|     \____/|____/|______|_____\_____|
-	 */
-
-	/**
-	 * Sets up the client and all relevant streams.
+	 * Try connect to the server, exit program if fails.
 	 *
-	 * @return {@code true} if setup is successful, {@code false} otherwise.
+	 * @return {@code true} if connection is successful, {@code false} otherwise.
 	 */
-	public boolean setup() {
-		// create client socket
+	public boolean connect() {
 		try {
 			this.client = new Socket(this.hostname, this.port);
-		} catch (IOException e) {
-			KError.printError("Unable to connect to server.", e);
-			return false;
-		}
 
-		// get input and output streams
-		try {
-			this.dos = new DataOutputStream(this.client.getOutputStream());
+			// get input / output streams
 			this.dis = new DataInputStream(this.client.getInputStream());
-		} catch (IOException e) {
-			KError.printError("Unable to obtain data streams.", e);
+			this.dos = new DataOutputStream(this.client.getOutputStream());
+		} catch (Exception e) {
+			System.out.printf("No connection available for %s:%d\n", this.hostname, this.port);
+			JOptionPane.showMessageDialog(null, "No server listening on port " + this.port);
 			return false;
 		}
 
@@ -89,54 +80,258 @@ public class Client {
 	}
 
 	/**
-	 * Attemps to log a specified user in.
+	 * Logs a user into the server.
 	 *
-	 * @param user the user to log in.
-	 * @return {@code true} if user is accepted, {@code false} otherwise.
+	 * @param username the username of the user to log in.
 	 */
-	public boolean login(String user) {
-		user = user.trim();
+	public boolean login(String username) {
+		String cmd = "login " + username;
+		String resp = "";
 
-		// check for no username
-		if (user.length() < 1) {
-			return false;
-		}
-
-		// send login packet
 		try {
-			this.dos.writeUTF("login#" + user);
-			this.dos.flush();
+			this.dos.writeUTF(cmd);
+			resp = this.dis.readUTF();
 		} catch (IOException e) {
-			KError.printError("Unable to send login packet.", e);
-			return false;
+			System.err.println("Cannot send login command.");
 		}
 
-		String response = "";
-
-		// attempt to read response from server
-		try {
-			response = this.dis.readUTF().trim();
-		} catch (IOException e) {
-			KError.printError("Unable to read server response.", e);
-			return false;
+		if (resp.equals("login success")) {
+			this.username = username;
+			return true;
 		}
 
-		// login unsuccessful
-		if (!response.equals("login#s")) {
-			return false;
-		}
-
-		// login successful
-		this.username = user;
-		return true;
+		return false;
 	}
 
 	/**
-	 * Main function.
+	 * Send logout command to server.
 	 *
-	 * @param args the command-line arguments.
+	 * @param usrname the username of the user to log out.
 	 */
-	public static void main(String[] args) {
-		Client cli = new Client("localhost", 8080);
+	public void logout(String usrname) {
+		String cmd = "logout " + username;
+
+		try {
+			this.dos.writeUTF(cmd);
+		} catch (IOException e) {
+			System.err.println("Cannot send logout command.");
+		}
+
+		this.username = "";
+		closeAll();
+		System.exit(0);
+	}
+
+	/**
+	 * Sends a message from the client to the server.
+	 *
+	 * @param message the message to send.
+	 */
+	public void send(String message) {
+		// if client wants to disconnect
+		if (message.equals("quit")) {
+			logout(this.username);
+			return;
+		}
+
+		// push client message to server
+		try {
+			this.dos.writeUTF("msg " + message);
+		} catch (Exception e) {
+			System.err.println("Server has been shutdown.");
+			this.globalTxa.appendText("[ above message has not been sent ]");
+		}
+	}
+
+	/**
+	 * Whispers a message to a user.
+	 *
+	 * @param toUser user to send whisper to.
+	 * @param message the message to send.
+	 */
+	public void whisper(String toUser, String message) {
+		// if client wants to disconnect
+		if (message.equals("quit")) {
+			System.out.println("\nClosing connection");
+			logout(this.username);
+			return;
+		}
+
+		// push client message to server
+		try {
+			this.dos.writeUTF("whsp " + toUser + " " + message);
+		} catch (Exception e) {
+			System.err.println("Server has been shutdown.");
+			this.globalTxa.appendText("[ above message has not been sent ]");
+		}
+	}
+
+	/**
+	 * Reads all messages from server and prints them to the textarea.
+	 *
+	 * @param globalTxa textarea to print server messages to.
+	 */
+	public void readServerMsgs(TextArea globalTxa, TextArea whisperTxa,
+			ListView<String> lstOnline, ListView<String> lstOffline,
+			ComboBox<String> cmbWhisperTo) {
+		this.globalTxa = globalTxa;
+		this.whisperTxa = whisperTxa;
+		this.lstOnline = lstOnline;
+		this.lstOffline = lstOffline;
+		this.cmbWhisperTo = cmbWhisperTo;
+
+		// start new thread to read messages from server
+		Thread t = new Thread() {
+			@Override
+			public void run() {
+				loopMessages();
+			}
+		};
+
+		t.start();
+	}
+
+	/**
+	 * Loops infinitely to get messages.
+	 */
+	public void loopMessages() {
+		String msg = "";
+		this.lstOnline.getItems().add(this.username);
+
+		// continually get input from server
+		while (true) {
+			try {
+				msg = this.dis.readUTF();
+
+				// ignore invalid messages
+				if (!msg.contains(" ")) {
+					System.out.println(msg);
+					continue;
+				}
+
+				int idx = msg.indexOf(" ");
+				String cmd = msg.substring(0, idx);
+				String body = msg.substring(idx + 1);
+
+				// ignore messages such as "login success"
+				if (cmd.equals("login") || cmd.equals("logout")) {
+					continue;
+				}
+
+				if (cmd.equals("online")) {
+					idx = body.indexOf(" ");
+					String user = body.substring(0, idx);
+
+					// stage the change for update in main GUI thread
+					Platform.runLater(new Runnable() {
+						@Override
+						public void run() {
+							lstOffline.getItems().remove(user);
+							lstOnline.getItems().add(user);
+							cmbWhisperTo.getItems().add(user);
+						}
+					});
+
+					Thread.sleep(500);
+					continue;
+				}
+
+				if (cmd.equals("offline")) {
+					idx = body.indexOf(" ");
+					String user = body.substring(0, idx);
+
+					// stage the change for update in main GUI thread
+					Platform.runLater(new Runnable() {
+						@Override
+						public void run() {
+							lstOnline.getItems().remove(user);
+							lstOffline.getItems().add(user);
+							cmbWhisperTo.getItems().remove(user);
+						}
+					});
+
+					Thread.sleep(500);
+					continue;
+				}
+
+				// put in different text areas for global and whispers
+				if (cmd.equals("msg")) {
+					this.globalTxa.appendText("\n" + body + "\n");
+				} else if (cmd.equals("whsp")) {
+					this.whisperTxa.appendText("\n" + body + "\n");
+				}
+			} catch (Exception e) {
+				break;
+			}
+		}
+
+		closeAll();
+	}
+
+	/**
+	 * Closes all connections.
+	 */
+	public void closeAll() {
+		try {
+			this.client.close();
+			this.dis.close();
+			this.dos.close();
+		} catch (IOException e) {
+			System.err.println("Error closing connections: " + e);
+		}
+	}
+
+	/**
+	 * Adds a user listener to the list.
+	 *
+	 * @param ul the userlistener to add.
+	 */
+	public void addUserListener(UserListener ul) {
+		this.userListeners.add(ul);
+	}
+
+	/**
+	 * Removes a user listener from the list.
+	 *
+	 * @param ul the userlistener to remove.
+	 */
+	public void removeUserListener(UserListener ul) {
+		this.userListeners.remove(ul);
+	}
+
+	/**
+	 * Gets the current state of the DataOutputStream.
+	 *
+	 * @return current DataOutputStream.
+	 */
+	public DataOutputStream getDos() {
+		return this.dos;
+	}
+
+	/**
+	 * Sets the current username to the one specified.
+	 *
+	 * @param username the new username.
+	 */
+	public void setUsername(String username) {
+		this.username = username;
+	}
+
+	/**
+	 * Gets the current clients username.
+	 *
+	 * @return the username of the client.
+	 */
+	public String getUsername() {
+		return this.username;
+	}
+
+	/**
+	 * Returns the commands accepted by the server.
+	 *
+	 * @return accepted commands.
+	 */
+	public ArrayList<String> getCommands() {
+		return this.commands;
 	}
 }
