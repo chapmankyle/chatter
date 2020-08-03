@@ -1,248 +1,314 @@
-/**
- * Chatter is a peer-to-peer communication program written in Java. Copyright
- * (C) 2019 Kyle Chapman
- *
- * This program is free software: you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or (at your option) any later
- * version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
- * FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
- * details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program. If not, see <https://www.gnu.org/licenses/>.
- */
-
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.HashSet;
+import java.util.ArrayList;
+
+/**
+ * ClientHandler class to handle all client connections to the server.
+ *
+ * Each new client that connects to the server is started as a new Thread
+ * and processed individually.
+ *
+ * @since 27 July 2019
+ * @version 1.0.0
+ * @author Kyle Chapman, Noah Atkins
+ */
 
 public class ClientHandler extends Thread {
 
 	// globals
-	private static Server server;
+	private final Socket client;
+	private final Server server;
 
 	private String username;
-	private Socket client;
-
 	private DataInputStream dis;
 	private DataOutputStream dos;
 
-	/**
-	 * Constructor for the handling of a client.
-	 *
-	 * @param serv   the originating server.
-	 * @param client the client that needs to be handled.
-	 */
-	public ClientHandler(Server serv, Socket client) {
-		server = serv;
+	private ArrayList<String> commands;
+
+	// default constructor
+	public ClientHandler(Server server, Socket client) {
+		this.server = server;
 		this.client = client;
-
 		this.username = "";
-		getDataStreams();
-	}
+		this.commands = new ArrayList<>();
 
-	/**
-	 * Gets the data streams from the given client.
-	 */
-	private void getDataStreams() {
+		// add all commands to list
+		this.commands.add("login");
+		this.commands.add("logout");
+		this.commands.add("msg");
+		this.commands.add("whsp");
+
+		// getting data streams
 		try {
-			this.dos = new DataOutputStream(this.client.getOutputStream());
 			this.dis = new DataInputStream(this.client.getInputStream());
-		} catch (IOException e) {
-			KError.printError("Unable to obtain data streams.", e);
+			this.dos = new DataOutputStream(this.client.getOutputStream());
+		} catch (Exception e) {
+			System.err.println("Error: " + e);
 		}
 	}
 
-	/**
-	 * Run method inherited from Thread.
-	 */
+	// run function for overriding default Thread.run()
 	@Override
 	public void run() {
-		Command command = Command.INVALID;
-
-		// keep connection open to receive data
+		// allow client to keep sending messages
 		while (true) {
-			String recv = "";
-
-			// read and process command received
 			try {
-				recv = this.dis.readUTF();
+				// get a message
+				String recv = this.dis.readUTF();
 
-				// ignore message not split with #
-				if (!recv.contains("#")) {
+				if (!recv.contains(" ")) {
+					System.out.println("Invalid message");
 					continue;
 				}
 
-				int idx = recv.indexOf("#");
+				int idx = recv.indexOf(" ");
+				String cmd = recv.substring(0, idx);
+				String body = recv.substring(idx + 1);
 
-				// get data from message
-				String header = recv.substring(0, idx);
-				String body = recv.substring(idx + 1).trim();
-
-				command = command.getValue(header);
-
-				// ignore invalid header command
-				if (command == Command.INVALID) {
-					System.out.println("\nClient sent \033[31minvalid\033[0m header!");
+				if (!commands.contains(cmd)) {
+					System.err.println("Invalid command");
 					continue;
 				}
 
-				// logout user if requested
-				if (command == Command.LOGOUT) {
-					logout(body);
+				// handle different tokens
+				switch (cmd) {
+					case "login":
+						login(body);
+						break;
+					case "logout":
+						logout(body);
+						break;
+					case "msg":
+						message(body);
+						break;
+					case "whsp":
+						whisper(body);
+						break;
+				}
+
+				if (cmd.equals("logout")) {
 					break;
 				}
 
-				processCommand(command, body);
+				// set most recent message and user who sent message
 			} catch (IOException e) {
-				if (this.username.isEmpty()) {
-					break;
-				}
-
-				// logout user
-				logout(this.username);
 				break;
 			}
 		}
-	}
 
-	/**
-	 * Processes the command that the client sent.
-	 *
-	 * @param cmd the command that the client sent.
-	 * @param body the rest of the message.
-	 */
-	private void processCommand(Command cmd, String body) {
-		switch (cmd) {
-			case USERS:
-				users(body);
-				break;
-			case LOGIN:
-				login(body);
-				break;
-			case MSG:
-				message(body);
-				break;
-			case WHSP:
-				whisper(body);
-				break;
-			default:
-				break;
+		// close connections
+		try {
+			this.client.close();
+			this.dis.close();
+			this.dos.close();
+		} catch (IOException e) {
+			System.err.println("Error (clienthandler): " + e);
 		}
 	}
 
 	/**
-	 * Returns a string list of users who are currently online.
+	 * Allows user to log in.
 	 *
-	 * @param user the user who requested the list of online users.
+	 * @param body the rest of the message.
 	 */
-	private void users(String user) {
-		HashSet<String> onlineUsers = server.getOnlineUsers();
+	public void login(String body) {
+		String usr = body.trim();
 
-		// build string of all online users
-		StringBuilder sb = new StringBuilder();
-		for (String uname : onlineUsers) {
-			// ignore user who requested list
-			if (uname.equals(user)) {
+		// check if user with same name is not online
+		if (this.server.getOnlineUsers().contains(usr)) {
+			try {
+				this.dos.writeUTF("login failure");
+			} catch (IOException e) {
+				System.err.println("Could not send failure.\nError: " + e);
+			}
+
+			return;
+		}
+
+		// if username is unique, log user in
+		try {
+			this.dos.writeUTF("login success");
+		} catch (IOException e) {
+			System.err.println("Could not send success.\nError: " + e);
+			return;
+		}
+
+		this.username = usr;
+		this.server.addUser(this.username);
+
+		System.out.println("\n-> \033[32m" + this.username + "\033[0m has joined the party!");
+		System.out.println(this.server.getNumOnlineUsers() + " users currently online.\n");
+
+		// get all clients connected
+		ArrayList<ClientHandler> clients = this.server.getClients();
+
+		String msg = "";
+		String tail = " is online!";
+
+		// send current user message saying other users are online
+		for (ClientHandler currClient : clients) {
+			String ccUsername = currClient.getUsername();
+
+			if (this.username.equals(ccUsername) || ccUsername.equals("")) {
 				continue;
 			}
 
-			sb.append(uname + "#");
+			msg = "online " + ccUsername + tail;
+			sendToClient(msg);
 		}
 
-		String userList = "users#" + sb.toString();
+		// send all other online users the message that the current user is online
+		msg = "online " + this.username + tail;
+		for (ClientHandler currClient : clients) {
+			if (this.username.equals(currClient.getUsername())) {
+				continue;
+			}
 
-		// write user list to output
-		try {
-			this.dos.writeUTF(userList);
-			this.dos.flush();
-		} catch (IOException e) {
-			KError.printError("Unable to write user list to output.", e);
+			currClient.sendToClient(msg);
 		}
 	}
 
 	/**
-	 * Connects a user to the server.
+	 * Allows user to log out.
 	 *
-	 * @param user the user to connect.
+	 * @param body the rest of the message.
 	 */
-	private void login(String user) {
-		// no username specified
-		if (user.isEmpty()) {
+	public void logout(String body) {
+		String usr = body.trim();
+
+		try {
+			this.dos.writeUTF("logout success");
+		} catch (IOException e) {
+			System.err.println("Could not send logout success.");
 			return;
 		}
-	}
 
-	/**
-	 * Disconnects a user from the server.
-	 *
-	 * @param user the user to disconnect.
-	 */
-	private void logout(String user) {
+		this.server.removeUser(this);
+		System.out.println("\n\033[31m" + usr + " has disconnected.\033[0m\n");
+		this.username = "";
 
-	}
+		// get all online clients
+		ArrayList<ClientHandler> clients = this.server.getClients();
 
-	/**
-	 * Displays a message sent by a user to everyone else connected.
-	 *
-	 * @param user the user who sent the message.
-	 */
-	private void message(String user) {
+		String msg = "";
+		String tail = " has disconnected :(";
 
-	}
-
-	/**
-	 * Sends a private message (whisper) to another connected client.
-	 *
-	 * @param body the body of the command sent.
-	 */
-	private void whisper(String body) {
-
-	}
-
-	/**
-	 *    _____  _    _ ____  _      _____ _____
-	 *   |  __ \| |  | |  _ \| |    |_   _/ ____|
-	 *   | |__) | |  | | |_) | |      | || |
-	 *   |  ___/| |  | |  _ <| |      | || |
-	 *   | |    | |__| | |_) | |____ _| || |____
-	 *   |_|     \____/|____/|______|_____\_____|
-	 */
-
-	/**
-	 * Closes all client connections.
-	 */
-	public void close() {
-		try {
-			if (client != null) {
-				client.close();
+		// send all other online users the message that the current user is offline
+		msg = "offline " + usr + tail;
+		for (ClientHandler currClient : clients) {
+			if (usr.equals(currClient.getUsername())) {
+				continue;
 			}
 
-			if (this.dis != null) {
-				this.dis.close();
-			}
-
-			if (this.dos != null) {
-				this.dos.close();
-			}
-		} catch (IOException e) {
-			KError.printError("Unable to close all connections for '" +
-				this.username + "'.", e);
+			currClient.sendToClient(msg);
 		}
 	}
 
 	/**
-	 * Gets the username of the current client.
+	 * Shows any message in global chat sent by the client.
 	 *
-	 * @return the username of the handled client.
+	 * @param body the rest of the message.
+	 */
+	public void message(String body) {
+		String msg = body.trim();
+
+		this.server.setCurrMsg(msg);
+		this.server.setCurrUser(this.username);
+
+		System.out.println(this.username + " : " + msg);
+
+		// get all connected clients
+		ArrayList<ClientHandler> clients = this.server.getClients();
+
+		String fullMsg = "";
+
+		// send all other clients message that current user has typed
+		fullMsg = "msg " + this.username + " : " + msg;
+		for (ClientHandler currClient : clients) {
+			if (this.username.equals(currClient.getUsername())) {
+				continue;
+			}
+
+			currClient.sendToClient(fullMsg);
+		}
+	}
+
+	/**
+	 * Shows a whisper from the current user.
+	 *
+	 * @param body the rest of the message.
+	 */
+	public void whisper(String body) {
+		int idx = body.indexOf(" ");
+		String toUser = body.substring(0, idx);
+		String message = body.substring(idx + 1);
+
+		if (this.username.equals(toUser)) {
+			System.out.println("\033[35m" + this.username +
+				" tried to whisper to themself. Not allowed.\033[0m");
+			return;
+		}
+
+		if (!this.server.getOnlineUsers().contains(toUser)) {
+			System.out.println("\033[35mwhisper (" + this.username + " -> " + toUser +
+				") unsuccessful; user not online.\033[0m");
+			return;
+		}
+
+		System.out.println("\033[35m" + this.username + " -> " + toUser +
+			" : \033[0m" + message);
+
+		// get all connected clients
+		ArrayList<ClientHandler> clients = this.server.getClients();
+
+		String msg = "";
+
+		// send all other clients message that current user has typed
+		msg = "whsp " + this.username + " : " + message;
+		for (ClientHandler currClient : clients) {
+			if (!toUser.equals(currClient.getUsername())) {
+				continue;
+			}
+
+			currClient.sendToClient(msg);
+		}
+	}
+
+	/**
+	 * Sends a message to the client.
+	 *
+	 * @param msg the message to send.
+	 */
+	public void sendToClient(String msg) {
+		if (this.username.equals("")) {
+			return;
+		}
+
+		try {
+			this.dos.writeUTF(msg);
+		} catch (IOException e) {
+			System.err.println("Cannot send to client.\nError: " + e);
+		}
+	}
+
+	/**
+	 * Gets the current client's username.
+	 *
+	 * @return client's username.
 	 */
 	public String getUsername() {
 		return this.username;
+	}
+
+	public void closeAll() {
+		try {
+			this.client.close();
+			this.dis.close();
+			this.dos.close();
+		} catch (IOException e) {
+			System.err.println("Error closing connections: " + e);
+		}
 	}
 }
