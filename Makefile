@@ -22,7 +22,7 @@ CLS := $(wildcard $(JCLASSDIR)/*.class)
 
 # location of main functions
 SERVER = Server
-CLIENT = Client
+CLIENT = Main
 
 # rules
 default: all
@@ -33,6 +33,7 @@ all:
 	$(JC) -d ./$(JCLASSDIR) $(JFLAGS) $(SRCS)
 
 # `make server`
+.PHONY: server
 server:
 	mkdir -p $(JCLASSDIR)
 	$(JC) -d ./$(JCLASSDIR) $(JFLAGS) $(SRCS)
@@ -42,7 +43,7 @@ server:
 client:
 	mkdir -p $(JCLASSDIR)
 	$(JC) -d ./$(JCLASSDIR) $(JFLAGS) $(SRCS)
-	$(JVM) -cp ./$(JCLASSDIR) $(CLIENT)
+	$(JVM) -cp "./$(JCLASSDIR):./$(JGUISOURCEDIR)" $(CLIENT)
 
 # `make clean`
 .PHONY: clean
