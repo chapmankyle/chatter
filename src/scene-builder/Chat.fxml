@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.Pane?>
+<?import javafx.scene.paint.LinearGradient?>
+<?import javafx.scene.paint.Stop?>
+<?import javafx.scene.text.Font?>
+
+<AnchorPane maxHeight="614.0" maxWidth="924.0" minHeight="577.0" minWidth="800.0" prefHeight="577.0" prefWidth="915.0" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="Chat">
+   <children>
+      <TabPane layoutX="41.0" layoutY="110.0" prefHeight="380.0" prefWidth="580.0" style="-fx-border-width: 2; -fx-background-color: white; -fx-border-style: solid; -fx-border-color: lightgrey;" styleClass="-fx-background-color" tabClosingPolicy="UNAVAILABLE">
+        <tabs>
+          <Tab fx:id="tabGlobal" text="   Global   ">
+               <content>
+                  <Pane prefHeight="200.0" prefWidth="200.0">
+                     <children>
+                        <TextArea fx:id="txaMessages" editable="false" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="348.0" prefWidth="580.0" promptText="Messages will appear here :)" wrapText="true" />
+                     </children>
+                  </Pane>
+               </content>
+          </Tab>
+          <Tab fx:id="tabWhispers" text="   Whisper   ">
+               <content>
+                  <Pane prefHeight="200.0" prefWidth="200.0">
+                     <children>
+                        <TextArea fx:id="txaWhispers" editable="false" layoutY="45.0" prefHeight="305.0" prefWidth="580.0" promptText="Whispers will appear here :)" wrapText="true" />
+                        <Label fx:id="lblWhisperTo" layoutX="179.0" layoutY="14.0" text="Send To:">
+                           <font>
+                              <Font name="System Bold" size="15.0" />
+                           </font>
+                        </Label>
+                        <ComboBox fx:id="cmbWhisperTo" layoutX="263.0" layoutY="12.0" prefHeight="25.0" prefWidth="131.0" />
+                     </children>
+                  </Pane>
+               </content>
+          </Tab>
+        </tabs>
+      </TabPane>
+      <TextField fx:id="txfMessage" layoutX="41.0" layoutY="505.0" onKeyPressed="#enter" prefHeight="40.0" prefWidth="503.0" promptText="Start typing here...">
+         <font>
+            <Font size="15.0" />
+         </font>
+      </TextField>
+      <Label fx:id="lblUsername" layoutX="41.0" layoutY="70.0" prefHeight="30.0" prefWidth="471.0" text="Username">
+         <font>
+            <Font name="System Bold" size="18.0" />
+         </font>
+      </Label>
+      <Button fx:id="btnSend" layoutX="553.0" layoutY="505.0" mnemonicParsing="false" onAction="#sendMsg" prefHeight="40.0" prefWidth="68.0" text="Send" />
+      <Label layoutX="395.0" layoutY="25.0" text="DISPEAK CHAT" textAlignment="CENTER">
+         <font>
+            <Font name="System Bold" size="24.0" />
+         </font>
+         <textFill>
+            <LinearGradient endX="1.0" endY="1.0">
+               <stops>
+                  <Stop color="#f86b6b" />
+                  <Stop color="#ffc129" offset="1.0" />
+               </stops>
+            </LinearGradient>
+         </textFill>
+      </Label>
+      <Label layoutX="704.0" layoutY="113.0" text="Online Users">
+         <font>
+            <Font name="System Bold" size="18.0" />
+         </font>
+      </Label>
+      <ListView fx:id="lstOnlineUsers" layoutX="661.0" layoutY="149.0" prefHeight="131.0" prefWidth="214.0" />
+      <Label layoutX="701.0" layoutY="311.0" text="Offline Users">
+         <font>
+            <Font name="System Bold" size="18.0" />
+         </font>
+      </Label>
+      <ListView fx:id="lstOfflineUsers" layoutX="661.0" layoutY="350.0" prefHeight="140.0" prefWidth="214.0" />
+      <Button fx:id="btnConnectStatus" layoutX="529.0" layoutY="75.0" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" mnemonicParsing="false" onAction="#changeConnectStatus" prefHeight="26.0" prefWidth="91.0" text="Disconnect" textAlignment="CENTER" />
+   </children>
+</AnchorPane>
